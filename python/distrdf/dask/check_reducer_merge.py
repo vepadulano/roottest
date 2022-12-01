@@ -352,6 +352,46 @@ class TestReducerMerge:
 
         assert std.GetValue() == pytest.approx(1, 0.01), f"{std.GetValue()}"
 
+    def test_distributed_stats(self, connection):
+        """Test support for the Stats action."""
+        df = (
+            Dask.RDataFrame(10_000, daskclient=connection)
+                .Define("v", "gRandom->Uniform(0, 4)")
+                .Define("vec_v", "std::vector<double>({v, v+1, v+2})")
+                .Define("w", "1./(v+1)")
+                .Define("vec_w", "std::vector<double>({w, w+1, w+2})")
+                .Define("one", "1")
+                .Define("ones", "std::vector<double>({1., 1., 1.})")
+        )
+
+        s0 = df.Stats("v")
+        m0 = df.Mean("v")
+        v0 = df.StdDev("v")
+        s0prime = df.Stats("v", "one")
+        s0w = df.Stats("v", "w")
+
+        s1 = df.Stats("vec_v")
+        m1 = df.Mean("vec_v")
+        v1 = df.StdDev("vec_v")
+        s1w = df.Stats("vec_v", "vec_w")
+        s1prime0 = df.Stats("vec_v", "one")
+        s1prime1 = df.Stats("vec_v", "ones")
+
+        rel = 0.01
+
+        assert s0.GetMean() == pytest.approx(2, rel), f"{s0.GetMean()}!=2"
+        assert s0.GetMean() == pytest.approx(m0.GetValue(), rel), f"{s0.GetMean()}!=2"
+        assert s0.GetMean() == pytest.approx(s0prime.GetMean(), rel), f"{s0.GetMean()}!=2"
+        assert s0.GetRMS() == pytest.approx(v0.GetValue(), rel), f"{s0.GetRMS()}!=2"
+        assert s0w.GetMean() == pytest.approx(1.4829, rel), f"{s0w.GetMean()}!=2"
+
+        assert s1.GetMean() == pytest.approx(3, rel), f"{s1.GetMean()}!=3"
+        assert s1.GetMean() == pytest.approx(m1.GetValue(), rel), f"{s1.GetMean()}!=3"
+        assert s1.GetRMS() == pytest.approx(v1.GetValue(), rel), f"{s1.GetRMS()}!=3"
+        assert s1.GetMean() == pytest.approx(s1prime0.GetMean(), rel), f"{s1.GetMean()}!=3"
+        assert s1.GetMean() == pytest.approx(s1prime1.GetMean(), rel), f"{s1.GetMean()}!=3"
+        assert s1w.GetMean() == pytest.approx(3.3213, rel), f"{s1w.GetMean()}!=3"
+
 
 if __name__ == "__main__":
     pytest.main(args=[__file__])
