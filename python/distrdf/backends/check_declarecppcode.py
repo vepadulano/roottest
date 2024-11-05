@@ -62,7 +62,7 @@ class TestDeclare:
                 return num < 4;
             }  
             """)
-
+        
     def _distribute_single_declare_check_filter_and_histo(self, connection, backend):
     
         if backend == "dask":
